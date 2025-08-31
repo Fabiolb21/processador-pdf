@@ -13,7 +13,7 @@ st.set_page_config(
 
 def extrair_informacoes_pdf(arquivo_pdf):
     """
-    Extrai informações de PRODUTO, QTD. e o NÚMERO DA PÁGINA impresso no documento.
+    Extrai informações de PRODUTO e o NÚMERO DA PÁGINA impresso no documento.
     """
     dados_finais = []
     try:
@@ -32,23 +32,21 @@ def extrair_informacoes_pdf(arquivo_pdf):
                         break
             
             produtos_com_coords = []
-            qtds_com_coords = []
             coord_x_produto_inicio = 0; coord_x_produto_fim = 100
             coord_x_qtd_inicio = 400; coord_x_qtd_fim = 450
 
             for b in blocos:
                 x0, y0, _, _, texto, _, _ = b
                 texto_limpo = texto.strip()
-                if coord_x_produto_inicio < x0 < coord_x_produto_fim:
-                    match = re.search(r'(JBGF\d+)', texto_limpo)
+                if coord_x_produto_inicio < x0 < coord_x_produto_fim and "-" in texto_limpo:
+                    match = re.search(r'-\s*([^\s]+)', texto_limpo)
                     if match:
-                        produtos_com_coords.append({'produto': match.group(1), 'y': y0})
-                if coord_x_qtd_inicio < x0 < coord_x_qtd_fim and texto_limpo.isdigit():
-                    qtds_com_coords.append({'qtd': int(texto_limpo), 'y': y0})
+                        codigo_produto = match.group(1)
+                        if len(codigo_produto) > 6 and codigo_produto[0].isalpha():
+                            produtos_com_coords.append({'produto': codigo_produto})
 
             for prod in produtos_com_coords:
-                qtd_correspondente = next((qtd['qtd'] for qtd in qtds_com_coords if abs(prod['y'] - qtd['y']) < 10), 0)
-                dados_finais.append({"PRODUTO": prod['produto'], "QTD.": qtd_correspondente, "PÁGINA": numero_pagina_impresso})
+                dados_finais.append({"PRODUTO": prod['produto'], "PÁGINA": numero_pagina_impresso})
         documento.close()
     except Exception as e:
         st.error(f"Erro ao processar o arquivo {arquivo_pdf.name}: {e}")
@@ -79,7 +77,7 @@ if arquivos_pdf:
         st.success(f"🎉 Extração concluída com sucesso!")
         
         df = pd.DataFrame(todos_os_dados)
-        df = df[['PRODUTO', 'QTD.', 'PÁGINA']]
+        df = df[['PRODUTO', 'PÁGINA']]
         df.insert(0, 'ÍNDICE', range(1, 1 + len(df)))
 
         st.header("📊 Resultados da Extração")
@@ -91,7 +89,6 @@ if arquivos_pdf:
                          column_config={
                              "ÍNDICE": st.column_config.NumberColumn(width="small"),
                              "PRODUTO": st.column_config.TextColumn(width="large"),
-                             "QTD.": st.column_config.NumberColumn(width="small"),
                              "PÁGINA": st.column_config.TextColumn(width="small"),
                          })
 
